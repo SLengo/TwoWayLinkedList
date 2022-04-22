@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Xml;
 
 namespace TwoWayList.List
 {
@@ -11,9 +12,18 @@ namespace TwoWayList.List
     {
         private const byte ObjectSeparator = 0x00;
 
-        public ListNode Head;
-        public ListNode Tail;
-        
+        private const string SerErrMsg = "Serialization error occured: ";
+        private const string DeserErrMsg = "Deserialization error occured: ";
+        private static readonly string SerNullStreamErrMsg = $"{SerErrMsg}incoming stream was null";
+        private static readonly string SerCannotWriteErrMsg = $"{SerErrMsg}cannot write to passed stream";
+        private static readonly string DeserNullStreamErrMsg = $"{DeserErrMsg}incoming stream was null";
+        private static readonly string SerCannotReadErrMsg = $"{DeserErrMsg}cannot read from passed stream";
+        private static readonly string DeserInvalidDataErrMsg = $"{DeserErrMsg}incoming stream contains invalid data";
+        private static readonly string DeserUnexepectedEndOfDataErrMsg = $"{DeserErrMsg}incoming stream contains unexpected end of data";
+
+        public ListNode Head { get; private set; }
+        public ListNode Tail { get; private set; }
+
         private int count { get; set; }
         public int Count => count;
 
@@ -66,43 +76,41 @@ namespace TwoWayList.List
         {
             get
             {
-                if (count == 0)
+                if (index < 0 || index >= count)
                 {
-                    return null;
+                    throw new IndexOutOfRangeException();
+                }
+
+                int counter = 0;
+                ListNode found = null;
+
+                if (index < count / 2)
+                {
+                    foreach (var item in this)
+                    {
+                        if (counter == index)
+                        {
+                            found = item;
+                            break;
+                        }
+                        counter++;
+                    }
                 }
                 else
                 {
-                    int counter = 0;
-                    if (index >= count)
+                    counter = count - 1;
+                    foreach (var item in GetReverseEnumerator())
                     {
-                        throw new IndexOutOfRangeException();
-                    }
-                    else if (index < count / 2)
-                    {
-                        foreach (var item in this)
+                        if (counter == index)
                         {
-                            if (counter == index)
-                            {
-                                return item;
-                            }
-                            counter++;
+                            found = item;
+                            break;
                         }
-                    }
-                    else
-                    {
-                        counter = count - 1;
-                        foreach (var item in GetReverseEnumerator())
-                        {
-                            if (counter == index)
-                            {
-                                return item;
-                            }
-                            counter--;
-                        }
+                        counter--;
                     }
                 }
 
-                return null;
+                return found;
             }
         }
         private int GetNodeHash(ListNode listNode)
@@ -117,6 +125,11 @@ namespace TwoWayList.List
 
         public void Serialize(Stream s)
         {
+            if (s == null)
+            {
+                throw new NullReferenceException(SerNullStreamErrMsg);
+            }
+
             if (s.CanWrite)
             {
                 s.Position = 0;
@@ -124,6 +137,10 @@ namespace TwoWayList.List
                 {
                     WriteNodeRowToStream(item, s);
                 }
+            }
+            else
+            {
+                throw new InvalidOperationException(SerCannotWriteErrMsg);
             }
         }
         private void WriteNodeRowToStream(ListNode listNode, Stream s)
@@ -136,47 +153,89 @@ namespace TwoWayList.List
 
             if (listNode.Data != null)
             {
-                byte[] data = Encoding.UTF8.GetBytes(listNode.Data);
+                string encodedData = EscapeData(listNode.Data);
+                byte[] data = Encoding.UTF8.GetBytes(encodedData);
                 s.Write(data, 0, data.Length);
             }
             s.WriteByte(ObjectSeparator);
         }
+        private string EscapeData(string dataToEncode)
+        {
+            StringBuilder encodedData = new StringBuilder();
+
+            encodedData.Append("<");
+            if (dataToEncode != string.Empty)
+            {
+                encodedData.Append(XmlConvert.EncodeName(dataToEncode));
+            }
+            encodedData.Append(">");
+
+            return encodedData.ToString();
+        }
 
         public void Deserialize(Stream s)
         {
+            if (s == null)
+            {
+                throw new NullReferenceException(DeserNullStreamErrMsg);
+            }
+
+            Clear();
+
             if (s.CanRead)
             {
-                Dictionary<int, int> randRestoredIdx = new Dictionary<int, int>();
-                Dictionary<int, ListNode> restoredObjects = new Dictionary<int, ListNode>();
-
-                s.Position = 0;
-                while (s.Position < s.Length)
+                if (s.Length > 0)
                 {
-                    int currentObjCode = ReadNextNodeHashFromStream(s);
-                    int randomRefCode = ReadNextNodeHashFromStream(s);
+                    List<Tuple<int, int>> randRestoredIdx = new List<Tuple<int, int>>();
+                    Dictionary<int, ListNode> restoredObjects = new Dictionary<int, ListNode>();
 
-                    string restoredData = ReadNodeDataFromStream(s);
-
-                    Add(restoredData);
-                    restoredObjects.Add(currentObjCode, Tail);
-
-                    if (restoredObjects.ContainsKey(randomRefCode))
+                    s.Position = 0;
+                    while (s.Position < s.Length)
                     {
-                        restoredObjects[currentObjCode].Random = restoredObjects[randomRefCode];
+                        int currentObjCode = ReadNextNodeHashFromStream(s);
+                        int randomRefCode = ReadNextNodeHashFromStream(s);
+
+                        string restoredData = ReadNodeDataFromStream(s);
+
+                        if (restoredObjects.ContainsKey(currentObjCode))
+                        {
+                            throw new InvalidDataException(DeserInvalidDataErrMsg);
+                        }
+
+                        Add(restoredData);
+                        restoredObjects.Add(currentObjCode, Tail);
+
+                        if (restoredObjects.ContainsKey(randomRefCode))
+                        {
+                            restoredObjects[currentObjCode].Random = restoredObjects[randomRefCode];
+                        }
+                        else
+                        {
+                            randRestoredIdx.Add(new Tuple<int, int>(currentObjCode, randomRefCode));
+                        }
                     }
-                    else
+
+                    foreach (var randRestoreItem in randRestoredIdx)
                     {
-                        randRestoredIdx.Add(currentObjCode, randomRefCode);
+                        if (randRestoreItem.Item2 != -1)
+                        {
+                            if (!restoredObjects.ContainsKey(randRestoreItem.Item1)
+                                || !restoredObjects.ContainsKey(randRestoreItem.Item2))
+                            {
+                                throw new InvalidDataException(DeserInvalidDataErrMsg);
+                            }
+
+                            restoredObjects[randRestoreItem.Item1].Random = restoredObjects[randRestoreItem.Item2];
+                        }
                     }
+
+                    randRestoredIdx.Clear();
+                    restoredObjects.Clear();
                 }
-
-                foreach (var randRestoreItem in randRestoredIdx)
-                {
-                    if (randRestoreItem.Value > -1)
-                    {
-                        restoredObjects[randRestoreItem.Key].Random = restoredObjects[randRestoreItem.Value];
-                    }
-                }
+            }
+            else
+            {
+                throw new InvalidOperationException(SerCannotReadErrMsg);
             }
         }
         private int ReadNextNodeHashFromStream(Stream s)
@@ -189,19 +248,38 @@ namespace TwoWayList.List
         {
             List<byte> dataBytes = new List<byte>();
             int byteRead;
-            while ((byteRead = s.ReadByte()) != 0x00)
+            while ((byteRead = s.ReadByte()) != 0x00 && byteRead != -1)
             {
                 dataBytes.Add((byte)byteRead);
             }
 
+            if (byteRead == -1)
+            {
+                throw new InvalidDataException(DeserUnexepectedEndOfDataErrMsg);
+            }
+
             if (dataBytes.Any())
             {
-                return Encoding.UTF8.GetString(dataBytes.ToArray());
+                return UnescapeData(Encoding.UTF8.GetString(dataBytes.ToArray()));
             }
             else
             {
                 return null;
             }
+        }
+        private string UnescapeData(string toUnescape)
+        {
+            if (toUnescape != string.Empty)
+            {
+                StringBuilder stringBuilder = new StringBuilder(XmlConvert.DecodeName(toUnescape));
+
+                stringBuilder.Remove(0, 1);
+                stringBuilder.Remove(stringBuilder.Length - 1, 1);
+
+                return stringBuilder.ToString();
+            }
+
+            return toUnescape;
         }
     }
 }
