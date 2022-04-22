@@ -161,7 +161,7 @@ namespace TwoWayList.List
         }
         private string EscapeData(string dataToEncode)
         {
-            // no need to check dataToEncode to null - by desing, always not null
+            // no need to check dataToEncode to null - by design, always not null
             StringBuilder encodedData = new StringBuilder();
 
             // wrap into data <>; helps to keep string.Empty data
@@ -271,7 +271,7 @@ namespace TwoWayList.List
         }
         private string UnescapeData(string toUnescape)
         {
-            // no need to check toUnescape to null - by desing, always not null
+            // no need to check toUnescape to null - by design, always not null
             if (toUnescape != string.Empty)
             {
                 StringBuilder stringBuilder = new StringBuilder(XmlConvert.DecodeName(toUnescape));
