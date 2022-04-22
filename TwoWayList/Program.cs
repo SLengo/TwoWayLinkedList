@@ -1,11 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
-using System.Linq;
-using System.Runtime.Serialization.Formatters.Binary;
-using System.Text;
-using System.Threading.Tasks;
 using TwoWayList.List;
 
 namespace TwoWayList
@@ -14,16 +8,17 @@ namespace TwoWayList
     {
         static void Main(string[] args)
         {
-            // Test data
+            // Fill some data
             ListRandom listRandom = new ListRandom();
 
-            listRandom.Add("data 1");
+            listRandom.Add("data < 1");
             listRandom.Add(null);
-            listRandom.Add("data 3");
+            listRandom.Add("<data 3>");
             listRandom.Add(string.Empty);
-            listRandom.Add("data 5");
+            listRandom.Add("   ");
+            listRandom.Add("da\0ta 5");
 
-            // fill random
+            // Fill random
             Random randGenerator = new Random();
             foreach (var item in listRandom)
             {
@@ -31,38 +26,67 @@ namespace TwoWayList
                 item.Random = listRandom[randIdx];
             }
 
-            DemoUtils.PrintListStructure(listRandom);
-
-            string filepath = @"serializedList.dat";
-            if (File.Exists(filepath))
+            #region Write/read from MemoryStream
+            using (MemoryStream serializedData = new MemoryStream())
             {
-                File.Delete(filepath);
-            }
-
-            // serialization
-            Stopwatch stopwatch = new Stopwatch();
-            using (FileStream fs = new FileStream(filepath, FileMode.OpenOrCreate))
-            {
+                // serialization
                 Console.WriteLine("Serializing...");
-                stopwatch.Start();
-                listRandom.Serialize(fs);
-                stopwatch.Stop();
+                listRandom.Serialize(serializedData);
                 Console.WriteLine("Serialized");
-                // Console.WriteLine($"Serialization completed in: {stopwatch.Elapsed}");
-            }
 
-            // deserialization
-            using (FileStream fs = new FileStream(filepath, FileMode.OpenOrCreate))
-            {
+                // deserialization
                 Console.WriteLine("Deserializing...");
-                stopwatch.Restart();
                 ListRandom deserializedList = new ListRandom();
-                deserializedList.Deserialize(fs);
-                stopwatch.Stop();
-                Console.WriteLine("Deserialized");
 
-                DemoUtils.PrintListStructure(deserializedList);
+                try
+                {
+                    deserializedList.Deserialize(serializedData);
+                    Console.WriteLine("Deserialized");
+                    DemoUtils.PrintCompareListStructure(listRandom, deserializedList);
+                }
+                catch (Exception error) when
+                        (error is InvalidDataException
+                        || error is NullReferenceException)
+                {
+                    Console.WriteLine($"Errors occured:{Environment.NewLine}{error.Message}");
+                }
             }
+            #endregion
+
+            #region Write/read from file
+            //// serialization
+            //string filepath = @"serializedList.dat";
+            //if (File.Exists(filepath))
+            //{
+            //    File.Delete(filepath);
+            //}
+            //using (FileStream fs = new FileStream(filepath, FileMode.OpenOrCreate))
+            //{
+            //    Console.WriteLine("Serializing...");
+            //    listRandom.Serialize(fs);
+            //    Console.WriteLine("Serialized");
+            //}
+
+            //// deserialization
+            //using (FileStream fs = new FileStream(filepath, FileMode.OpenOrCreate))
+            //{
+            //    Console.WriteLine("Deserializing...");
+            //    ListRandom deserializedList = new ListRandom();
+
+            //    try
+            //    {
+            //        deserializedList.Deserialize(fs);
+            //        Console.WriteLine("Deserialized");
+            //        DemoUtils.PrintCompareListStructure(listRandom, deserializedList);
+            //    }
+            //    catch (Exception error) when
+            //            (error is InvalidDataException
+            //            || error is NullReferenceException)
+            //    {
+            //        Console.WriteLine($"Errors occured:{Environment.NewLine}{error.Message}");
+            //    }
+            //}
+            #endregion
 
             Console.ReadKey();
         }
