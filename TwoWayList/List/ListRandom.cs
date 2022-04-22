@@ -161,8 +161,10 @@ namespace TwoWayList.List
         }
         private string EscapeData(string dataToEncode)
         {
+            // no need to check dataToEncode to null - by desing, always not null
             StringBuilder encodedData = new StringBuilder();
 
+            // wrap into data <>; helps to keep string.Empty data
             encodedData.Append("<");
             if (dataToEncode != string.Empty)
             {
@@ -184,7 +186,7 @@ namespace TwoWayList.List
 
             if (s.CanRead)
             {
-                if (s.Length > 0)
+                if (s.Length > 0) // otherwise, just keep list empty - nothing to deserialize
                 {
                     List<Tuple<int, int>> randRestoredIdx = new List<Tuple<int, int>>();
                     Dictionary<int, ListNode> restoredObjects = new Dictionary<int, ListNode>();
@@ -217,7 +219,7 @@ namespace TwoWayList.List
 
                     foreach (var randRestoreItem in randRestoredIdx)
                     {
-                        if (randRestoreItem.Item2 != -1)
+                        if (randRestoreItem.Item2 != -1) // means, there is not null Random object for restored one
                         {
                             if (!restoredObjects.ContainsKey(randRestoreItem.Item1)
                                 || !restoredObjects.ContainsKey(randRestoreItem.Item2))
@@ -269,10 +271,12 @@ namespace TwoWayList.List
         }
         private string UnescapeData(string toUnescape)
         {
+            // no need to check toUnescape to null - by desing, always not null
             if (toUnescape != string.Empty)
             {
                 StringBuilder stringBuilder = new StringBuilder(XmlConvert.DecodeName(toUnescape));
 
+                // remove <> from escaped data
                 stringBuilder.Remove(0, 1);
                 stringBuilder.Remove(stringBuilder.Length - 1, 1);
 
