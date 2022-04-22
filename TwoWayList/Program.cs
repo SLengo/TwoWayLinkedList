@@ -11,9 +11,9 @@ namespace TwoWayList
             // Fill some data
             ListRandom listRandom = new ListRandom();
 
-            listRandom.Add("data < 1");
+            listRandom.Add("data < 0");
             listRandom.Add(null);
-            listRandom.Add("<data 3>");
+            listRandom.Add("<data 2>");
             listRandom.Add(string.Empty);
             listRandom.Add("   ");
             listRandom.Add("da\0ta 5");
