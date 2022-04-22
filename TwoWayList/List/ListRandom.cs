@@ -219,7 +219,7 @@ namespace TwoWayList.List
 
                     foreach (var randRestoreItem in randRestoredIdx)
                     {
-                        if (randRestoreItem.Item2 != -1) // means, there is not null Random object for restored one
+                        if (randRestoreItem.Item2 != -1) // means, there is no Random object for restored one
                         {
                             if (!restoredObjects.ContainsKey(randRestoreItem.Item1)
                                 || !restoredObjects.ContainsKey(randRestoreItem.Item2))
